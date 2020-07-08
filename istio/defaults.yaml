@@ -1,0 +1,25 @@
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: default
+spec:
+  mtls:
+    mode: DISABLE # Отключаем шифрование трафика на прокси
+
+---
+apiVersion: v1 # Сервис для доступа к Jaeger по порту на ноде
+kind: Service
+metadata:
+  name: tracing-nodeport
+  namespace: istio-system
+spec:
+  type: NodePort
+  ports:
+    - port: 16686
+      targetPort: 16686
+      protocol: TCP
+      name: "tracing-nodeport"
+      nodePort: 32083
+  selector:
+    app: jaeger

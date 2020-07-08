@@ -1,0 +1,14 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: Sidecar
+metadata:
+  name: proxy-app
+  namespace: default
+spec:
+  egress:
+    - hosts:
+        - "default/echoserver.default.svc.cluster.local" # Разрешаем сервису ходить к echoservice
+  outboundTrafficPolicy:
+    mode: REGISTRY_ONLY
+  workloadSelector:
+    labels:
+      app: proxy-app

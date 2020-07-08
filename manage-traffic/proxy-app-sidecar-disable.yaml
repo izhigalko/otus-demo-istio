@@ -1,0 +1,14 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: Sidecar
+metadata:
+  name: proxy-app
+  namespace: default
+spec:
+  egress:
+    - hosts:
+        - "~/*" # Это стандартная настройка, которая обозначает, сервису недоступно ничего
+  outboundTrafficPolicy:
+    mode: REGISTRY_ONLY
+  workloadSelector:
+    labels:
+      app: proxy-app
