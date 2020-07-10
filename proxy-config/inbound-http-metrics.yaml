@@ -7,11 +7,11 @@ spec:
   configPatches:
     - applyTo: HTTP_FILTER
       match:
-        context: ANY # inbound, outbound, and gateway
+        context: ANY # Все контексты - входящий/исходящий/Gate
         listener:
           filterChain:
             filter:
-              name: "envoy.http_connection_manager"
+              name: "envoy.http_connection_manager" # Применять к фильтру http
       patch:
         operation: INSERT_BEFORE # Добавляем во все фильтры http передачу мета информации от прокси к прокси
         value:
