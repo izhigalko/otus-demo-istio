@@ -14,7 +14,7 @@ async def hello(request: web.Request):
         s: client.ClientSession
         r: client.ClientResponse
 
-        async with client.ClientSession() as s:
+        async with client.ClientSession(raise_for_status=True) as s:
             data = None
             if request.can_read_body:
                 data = await request.text()
