@@ -155,4 +155,4 @@ kubectl apply -f proxy-config/inbound-http-metrics.yaml
 Зайдем в [Prometheus](http://127.0.0.1:32082) и запросим данные:
 
 ```text
-round(sum(rate(istio_requests_total{reporter="destination"}[15m])) by (destination_workload), 0.001)```
+round(sum(rate(istio_requests_total{reporter="destination"}[1m])) by (destination_workload), 0.001)```

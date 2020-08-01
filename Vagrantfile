@@ -55,6 +55,8 @@ Vagrant.configure("2") do |config|
       sudo cp -i /etc/kubernetes/admin.conf /home/vagrant/.kube/config
       sudo chown -Rf $(id -u vagrant):$(id -g vagrant) /home/vagrant/.kube
 
+      sudo docker build -t proxy-app -f /home/vagrant/app/src/Dockerfile /home/vagrant/app/src/
+
       SHELL
   end
 end
