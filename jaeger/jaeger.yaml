@@ -1,0 +1,41 @@
+# Создать Namespace
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: jaeger
+
+# Создать CRD, использующийся Jaeger operator'ом, чтобы развернуть Jaeger
+---
+apiVersion: jaegertracing.io/v1
+kind: Jaeger
+metadata:
+  namespace: jaeger
+  name: jaeger
+
+# Создать NodePort для прямого доступа к web-интерфейсу
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: "2020-09-30T11:18:43Z"
+  labels:
+    app: jaeger
+    app.kubernetes.io/component: service-query
+    app.kubernetes.io/instance: jaeger
+    app.kubernetes.io/part-of: jaeger
+  name: jaeger-query-nodeport
+  namespace: jaeger
+spec:
+  ports:
+    - name: http-query
+      port: 16686
+      protocol: TCP
+      targetPort: 16686
+  selector:
+    app: jaeger
+    app.kubernetes.io/instance: jaeger
+    app.kubernetes.io/name: jaeger
+    app.kubernetes.io/part-of: jaeger
+  sessionAffinity: None
+  type: NodePort

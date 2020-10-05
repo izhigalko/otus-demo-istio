@@ -1,0 +1,118 @@
+# Создать Namespace
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: istio-system
+
+# Создать CRD, использующийся Istio operator'ом, чтобы развернуть Istio
+---
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: main
+  namespace: istio-system
+spec:
+  components:
+    base: # Базовые настройки. Роли, сервисы, CRD
+      enabled: true
+
+    istiod_remote: # Настройки, при которых уровень управления установлен вне кластера
+      enabled: false
+
+    policy: # Управление авторизацией, аудит с помощью Mixer, deprecated
+      enabled: false
+
+    telemetry: # Телеметрия с помощью Mixer, deprecated
+      enabled: false
+
+    ingressGateways: # Общая точка для входа трафика в Service mesh
+      - name: istio-ingressgateway
+        enabled: false
+
+    egressGateways: # Общаая точка для выхода трафика из Service mesh
+      - name: istio-egressgateway
+        enabled: false
+
+    cni: # Istio container network interface плагин, обеспечивает настройку сети POD
+      enabled: true
+      namespace: "kube-system"
+
+    pilot: # Управление конфигурацией proxy
+      enabled: true
+      k8s:
+        replicaCount: 1
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+  values: # Настройки компонентов
+    meshConfig: # Настройки Service mesh
+
+      enableAutoMtls: false # Отключаем шифрование
+      enableTracing: true # Включаем tracing
+
+      defaultConfig: # Настройки proxy по-умолчанию
+        concurrency: 1 # Количество воркеров
+
+    global:
+      controlPlaneSecurityEnabled: false
+      proxy:
+        resources:
+          requests:
+            cpu: 50m
+            memory: 30Mi
+          limits:
+            cpu: 50m
+            memory: 128Mi
+        readinessPeriodSeconds: 60
+        holdApplicationUntilProxyStarts: true
+      proxy_init:
+        resources:
+          limits:
+            cpu: 50m
+            memory: 64Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+      tracer:
+        zipkin:
+          address: "jaeger-collector.jaeger:9411"
+
+    istio_cni:
+      enabled: true
+
+    pilot:
+      autoscaleEnabled: false
+      traceSampling: 100.0
+      enableProtocolSniffingForInbound: true
+      enableProtocolSniffingForOutbound: true
+
+    telemetry:
+      enabled: true
+      v1:
+        enabled: false
+      v2:
+        enabled: true
+        prometheus:
+          enabled: true
+
+    sidecarInjectorWebhook:
+      enableNamespacesByDefault: false
+      objectSelector:
+        enabled: false
+        autoInject: true
+
+    cni:
+      cniBinDir: /opt/cni/bin
+      cniConfDir: /etc/cni/net.d
+      excludeNamespaces:
+        - istio-system
+        - kube-system
+      repair:
+        deletePods: false
+

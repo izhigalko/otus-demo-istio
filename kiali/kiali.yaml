@@ -1,0 +1,77 @@
+# Создать Namespace
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kiali
+
+# Создать CRD, использующийся Kiali operator'ом, чтобы развернуть Kiali
+---
+apiVersion: kiali.io/v1alpha1
+kind: Kiali
+metadata:
+  name: kiali
+  namespace: kiali
+spec:
+  istio_namespace: "istio-system"
+  istio_component_namespaces:
+    prometheus: monitoring
+  auth:
+    strategy: "anonymous"
+  external_services:
+    istio:
+      component_status:
+        components:
+          - app_label: istiod
+            is_core: true
+          - app_label: istio-ingressgateway
+            is_core: false
+          - app_label: istio-egressgateway
+            is_core: false
+
+    grafana:
+      enabled: true
+      in_cluster_url: "http://prometheus-grafana.monitoring:80"
+      url: "http://prometheus-grafana.monitoring:80"
+      auth:
+        username: admin
+        password: admin
+        type: basic
+        use_kiali_token: false
+      component_status:
+        namespace: "monitoring"
+        app_label: "grafana"
+
+    prometheus:
+      url: "http://prom-prometheus.monitoring:9090"
+      component_status:
+        namespace: "monitoring"
+        app_label: "prometheus"
+        is_core: false
+
+    tracing:
+      enabled: true
+      in_cluster_url: "http://jaeger-query.jaeger:16686"
+      url: "http://jaeger-query.jaeger:16686"
+      component_status:
+        namespace: "jaeger"
+        app_label: "jaeger"
+
+# Создать NodePort для прямого доступа к web-интерфейсу
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kiali
+  name: kiali-nodeport
+  namespace: kiali
+spec:
+  ports:
+    - name: http
+      port: 20001
+      protocol: TCP
+      targetPort: 20001
+  selector:
+    app: kiali
+  type: NodePort
