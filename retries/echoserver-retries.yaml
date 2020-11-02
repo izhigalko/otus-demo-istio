@@ -1,0 +1,23 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: echoserver-retries
+spec:
+  hosts:
+    - echoserver.default.svc.cluster.local
+  http:
+    - match:
+        - uri:
+            prefix: /error
+      route:
+        - destination:
+            host: echoserver.default.svc.cluster.local
+      retries:
+        attempts: 3
+        retryOn: 5xx
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: echoserver.default.svc.cluster.local

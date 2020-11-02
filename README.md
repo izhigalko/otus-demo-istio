@@ -166,6 +166,12 @@ minikube service -n kiali kiali-nodeport
 
 Echoserver - сервис, отдающий в виде текста параметры входящего HTTP запроса.
 
+Собрать Docker-образ:
+
+```shell script
+eval $(minikube docker-env) && docker build -t proxy-app:latest -f app/src/Dockerfile app/src
+```
+
 Развернуть приложение `echoserver` в кластере:
 
 ```shell script
@@ -188,12 +194,6 @@ curl $(minikube service echoserver --url)
 
 Proxy-app - сервис, умеющий запрашивать другие запросы по query-параметру url. 
 
-Собрать Docker-образ `proxy-app`:
-
-```shell script
-eval $(minikube docker-env) && docker build -t proxy-app:latest -f app/src/Dockerfile app/src
-```
-
 Развернуть приложение `proxy-app` в кластере:
 
 ```shell script
@@ -210,6 +210,11 @@ kubectl get po -l "app=proxy-app"
 
 ```shell script
 curl $(minikube service proxy-app --url)
+```
+
+Посмотреть логи приложения:
+```shell script
+kubectl logs -l app=proxy-app -c proxy-app
 ```
 
 ### Нагружаем приложения
@@ -232,7 +237,7 @@ kubectl apply -f app/load.yaml
 kubectl logs -l app=load
 ```
 
-## Ограничение доступа
+## Настраиваем взаимодействие между сервисами
 
 Сервис `proxy-app` позволяет запросить другие сервисы с помощью параметра url, сделаем это.
 
@@ -244,7 +249,7 @@ curl "$(minikube service proxy-app --url)?url=http://echoserver"
 
 В результате исполнения команды видно, что запрос на `echoserver` проходит.
 
-Ограничить доступ к `echoserver` для `proxy-app`:
+Ограничим доступ `proxy-app` ко всем сервисам:
 
 ```shell script
 kubectl apply -f manage-traffic/proxy-app-sidecar-disable.yaml
@@ -259,7 +264,7 @@ curl "$(minikube service proxy-app --url)?url=http://echoserver"
 В результате исполнения команды получается ошибка, так как правила для исходящего трафика `proxy-app` настроены таким образом,
 что ему запрещены любые исходящие сетевые соединения.
 
-Открыть доступ до `echoserver`:
+Применим настройки, в которых сказано, что `proxy-app` может осуществлять запросы к `echoserver`:
 
 ```shell script
 kubectl apply -f manage-traffic/proxy-app-sidecar-enable.yaml
@@ -272,3 +277,62 @@ curl "$(minikube service proxy-app --url)?url=http://echoserver"
 ```
 
 В результате исполнения команды видно, что запрос на `echoserver` проходит.
+
+## Настраиваем безопасности
+
+В качестве примера настройки безопасности будем использовать настройку межсервисной аутентификации.
+
+Включить аутентификацию для `echoserver`:
+
+```shell script
+kubectl apply -f auth/echoserver-auth.yaml
+```
+
+Выполнить запрос к сервису `echoserver`:
+
+```shell script
+curl "$(minikube service proxy-app --url)?url=http://echoserver"
+```
+
+Выполнить запрос к сервису с указанием токена:
+
+```shell script
+curl -H "X-AUTH-TOKEN: token" "$(minikube service proxy-app --url)?url=http://echoserver"
+```
+
+Добавить автоматическую подстановку токена при вызове сервиса `echoserver`:
+
+```shell script
+kubectl apply -f auth/proxy-app-auth.yaml
+```
+
+Выполнить запрос к сервису `echoserver` без указания токена:
+
+```shell script
+curl "$(minikube service proxy-app --url)?url=http://echoserver"
+```
+
+## Настраиваем отказоустойчивость
+
+Рассмотрим настройку отказоустойчивости для метода `http://echoserver/error?times=3`. При его вызове
+последовательно возвращается 500 ошибка в количестве, указанном в параметре `times`. В этом случае,
+метод вернёт ошибку 3 раза, а на 4 вернет код 200.
+
+```shell script
+curl "$(minikube service proxy-app --url)?url=http://echoserver/error?times=3"
+```
+
+Применим правило, которое позволяет автоматически делать повтор запроса при возникновении ошибок с кодом 500
+или ошибок соединения.
+
+Применить политику повторов:
+
+```shell script
+kubectl apply -f retries/echoserver-retries.yaml
+```
+
+Выполнить запрос:
+
+```shell script
+curl "$(minikube service proxy-app --url)?url=http://echoserver/error?times=3"
+```
