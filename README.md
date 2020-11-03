@@ -147,7 +147,7 @@ helm repo update
 Установить Kiali Operator, разворачивающий Kiali
 
 ```shell script
-helm install --version "1.24.0" -n kiali-operator --create-namespace kiali-operator kiali/kiali-operator
+helm install --version "1.22.0" -n kiali-operator --create-namespace kiali-operator kiali/kiali-operator
 ```
 
 Развернуть Kiali:
