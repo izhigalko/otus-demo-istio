@@ -1,0 +1,25 @@
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: proxy-app-auth
+  namespace: default
+spec:
+  workloadSelector:
+    labels:
+      app: proxy-app
+  configPatches:
+    - applyTo: HTTP_ROUTE
+      match:
+        context: SIDECAR_OUTBOUND
+        routeConfiguration:
+          vhost:
+            name: "echoserver.default.svc.cluster.local:80"
+      patch:
+        operation: MERGE
+        value:
+          request_headers_to_add:
+            - append: false
+              header:
+                key: "X-AUTH-TOKEN"
+                value: "token"

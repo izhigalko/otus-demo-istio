@@ -4,155 +4,335 @@
 
 Для выполнения задания вам потребуется установить зависимости:
 
-- [VirtualBox](https://www.virtualbox.org/wiki/Downloads)
-- [Vagrant](https://www.vagrantup.com/downloads.html)
+- [Minikube 1.13.1](https://github.com/kubernetes/minikube/releases/tag/v1.13.1)
+- [Kubectl 0.19.2](https://github.com/kubernetes/kubectl/releases/tag/v0.19.2)
+- [Istioctl 1.7.3](https://github.com/istio/istio/releases/tag/1.7.3)
+- [Heml 3.3.4](https://github.com/helm/helm/releases/tag/v3.3.4)
 
-После установки нужно запустить команду запуска в корне проекта:
-
-```shell script
-vagrant up
-```
-
-Для совершения всех операций нам понадобится зайти в виртуальную машину:
+После установки нужно запустить Kubernetes. При необходимости можно изменить используемый драйвер с помощью
+флага `--driver`. 
 
 ```shell script
-vagrant ssh
+minikube start \
+--cpus=4 --memory=8g \
+--cni=flannel \
+--kubernetes-version="v1.19.0" \
+--extra-config=apiserver.enable-admission-plugins=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,\
+DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,PodPreset \
+--extra-config=apiserver.authorization-mode=Node,RBAC
 ```
+
+Операции будут совершаться с помощью утилиты `kubectl`
 
 ## Содержание
 
 * [Устройство Istio](#Устройство-Istio)
 * [Ограничение доступа](#Ограничение-доступа)
-* [Конфигурация proxy](#Конфигурация-proxy)
 
 ## Устройство Istio
 
+### Разворачиваем Jaeger
+
+Jaeger - решение трассировки. Компоненты Istio, такие как: sidecar-контейнер, gateway, отправляют данные запросов в
+систему. Таким образом получается полная трассировка запроса.
+
+Добавить репозиторий в Helm:
+
+```shell script
+helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
+helm repo update
+```
+
+Установить оператор, разворачивающий Jaeger:
+
+```shell script
+helm install --version "2.17.0" -n jaeger-operator --create-namespace -f jaeger/operator-values.yaml \
+jaeger-operator jaegertracing/jaeger-operator
+``` 
+
+Развернуть Jaeger:
+
+```shell script
+kubectl apply -f jaeger/jaeger.yaml
+```
+
+Проверить состояние Jaeger:
+
+```shell script
+kubectl get po -n jaeger -l app.kubernetes.io/instance=jaeger
+```
+
+Открыть web-интерфейс Jaeger:
+
+```shell script
+minikube service -n jaeger jaeger-query-nodeport
+```
+
+### Разворачиваем Prometheus
+
+Prometheus - система мониторинга. С помощью неё собираются метрики Service mesh.
+
+Добавить репозиторий в Helm:
+
+```shell script
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add stable https://kubernetes-charts.storage.googleapis.com/
+helm repo update
+```
+
+Развернуть решение по мониторингу на основе Prometheus:
+
+```shell script
+helm install --version "9.4.4" -n monitoring --create-namespace -f prometheus/operator-values.yaml prometheus \
+prometheus-community/kube-prometheus-stack
+``` 
+
+Проверить состояние компонентов мониторинга:
+
+```shell script
+kubectl get po -n monitoring
+```
+
+Добавить сервис типа NodePort для прямого доступа к Prometheus и Grafana:
+
+```shell script
+kubectl apply -f prometheus/monitoring-nodeport.yaml
+```
+
+Открыть web-интерфейс Grafana:
+
+```shell script
+minikube service -n monitoring prometheus-grafana-nodeport
+```
+
+Открыть web-интерфейс Prometheus:
+
+```shell script
+minikube service -n monitoring prom-prometheus-nodeport
+```
+
 ### Разворачиваем Istio 
 
-На данном этапе мы установим Istio.
-Так же, можно [посмотреть манифест с комментариями](istio/istio-manifest.yaml)
+Istio - Service mesh решение для облачных платформ, использующее Envoy.
 
-Применяем манифест:
-
-```shell script
-istioctl manifest apply -f istio/istio-manifest.yaml
-```
-
-Применяем настройки по-умолчанию:
+Установить оператор, разворачивающий Istio:
 
 ```shell script
-kubectl apply -f istio/defaults.yaml
+istioctl operator init --watchedNamespaces istio-system --operatorNamespace istio-operator
 ```
 
-__Стоить отметить, что все операции по изменению конфигурации Istio 
-(добавление компонентов, обновление, удаление) нужно совершать с указанием манифеста,
-используемого при установке.__
-
-Дождитесь окончания установки. Далее, вы можете получить состояние
-уровня управления Istio с помощью команды:
+Развернуть Istio c помощью оператора:
 
 ```shell script
-kubectl get all -n istio-system
+kubectl apply -f istio/istio.yaml
 ```
 
-### Устанавливаем приложение
+Проверить состояние Istio:
 
-Развернем приложение в кластере:
+```shell script
+kubectl get all -n istio-system -l istio.io/rev=default
+```
+
+### Устанавливаем Kiali
+
+Kiali - доска управления Service mesh
+
+Добавить репозиторий в Helm:
+
+```shell script
+helm repo add kiali https://kiali.org/helm-charts
+helm repo update
+```
+
+Установить Kiali Operator, разворачивающий Kiali
+
+```shell script
+helm install --version "1.22.0" -n kiali-operator --create-namespace kiali-operator kiali/kiali-operator
+```
+
+Развернуть Kiali:
+
+```shell script
+kubectl apply -f kiali/kiali.yaml
+```
+
+Открыть web-интерфейс Kiali:
+
+```shell script
+minikube service -n kiali kiali-nodeport
+```
+
+### Устанавливаем echoserver
+
+Echoserver - сервис, отдающий в виде текста параметры входящего HTTP запроса.
+
+Собрать Docker-образ:
+
+```shell script
+eval $(minikube docker-env) && docker build -t proxy-app:latest -f app/src/Dockerfile app/src
+```
+
+Развернуть приложение `echoserver` в кластере:
 
 ```shell script
 kubectl apply -f app/echoserver.yaml
 ```
 
-Посмотреть статус приложения можно с помощью команды:
+Проверить статус echoserver:
 
 ```shell script
 kubectl get po -l "app=echoserver"
 ```
 
-Результат данной команды вернет число контейнеров в Pod равное двум. Если посмотреть
-подробнее:
+Выполнить запрос к сервису:
 
 ```shell script
-kubectl get po -l "app=echoserver" -o yaml
+curl $(minikube service echoserver --url)
 ```
 
-То будет видно, что в приложение был встроен sidecar-контейнер istio-proxy.
-Он обеспечивает уровень данных Istio.
+### Устанавливаем proxy-app
 
-Echoserver доступен по ссылке:
-[http://127.0.0.1:32080](http://127.0.0.1:32080)
+Proxy-app - сервис, умеющий запрашивать другие запросы по query-параметру url. 
 
-## Ограничение доступа
-
-### Устанавливаем приложение
-
-Развернем другое приложение, оно будет обращаться к `echoserver`.
-
-Для начала надо собрать образ:
-
-```shell script
-sudo docker build -t proxy-app:latest -f /home/vagrant/app/src/Dockerfile /home/vagrant/app/src/
-```
-
-Потом развернуть приложение:
+Развернуть приложение `proxy-app` в кластере:
 
 ```shell script
 kubectl apply -f app/proxy-app.yaml
 ```
 
-Посмотреть статус приложения можно с помощью команды:
+Проверить статус приложения:
 
 ```shell script
 kubectl get po -l "app=proxy-app"
 ```
 
-Необходимо дождаться окончания запуска приложения.
-
-Можно посмотреть конфигурацию прокси-сервера до и после исполнения окманд с помощью:
+Выполнить запрос к сервису:
 
 ```shell script
-export POD=$(kubectl get pods --selector=app=proxy-app -o jsonpath='{.items[*].metadata.name}') && \
-kubectl exec pod/$POD -c istio-proxy -- curl http://127.0.0.1:15000/config_dump | less
+curl $(minikube service proxy-app --url)
 ```
 
-### Ограничим доступ proxy-app до echoserver
+Посмотреть логи приложения:
+```shell script
+kubectl logs -l app=proxy-app -c proxy-app
+```
 
-Proxy-app доступен по ссылке: 
-[http://127.0.0.1:32081/?url=http://echoserver.default](http://127.0.0.1:32081/?url=http://echoserver.default)
+### Нагружаем приложения
 
-Перейдя по ссылке выше видно, что на данный момент `echoserver` доступен для `proxy-app`.
+Собрать нагрузочный образ:
 
-Применим конфигурацию:
+```shell script
+eval $(minikube docker-env) && docker build -t load-otus-demo:latest -f app/load/Dockerfile app/load
+```
+
+Запустить нагрузочный образ:
+
+```shell script
+kubectl apply -f app/load.yaml
+```
+
+Посмотреть логи нагрузки:
+
+```shell script
+kubectl logs -l app=load
+```
+
+## Настраиваем взаимодействие между сервисами
+
+Сервис `proxy-app` позволяет запросить другие сервисы с помощью параметра url, сделаем это.
+
+Выполнить запрос к сервису `echoserver`:
+
+```shell script
+curl "$(minikube service proxy-app --url)?url=http://echoserver"
+```
+
+В результате исполнения команды видно, что запрос на `echoserver` проходит.
+
+Ограничим доступ `proxy-app` ко всем сервисам:
+
 ```shell script
 kubectl apply -f manage-traffic/proxy-app-sidecar-disable.yaml
 ```
 
-По ссылке [http://127.0.0.1:32081/?url=http://echoserver.default](http://127.0.0.1:32081/?url=http://echoserver.default)
-видно, что доступ до `echoserver` пропал.
+Выполнить запрос к сервису `echoserver`:
 
-### Вернем доступ proxy-app до echoserver
+```shell script
+curl "$(minikube service proxy-app --url)?url=http://echoserver"
+```
 
-Мы можем открыть доступ для `echoserver` с помощью команды:
+В результате исполнения команды получается ошибка, так как правила для исходящего трафика `proxy-app` настроены таким образом,
+что ему запрещены любые исходящие сетевые соединения.
+
+Применим настройки, в которых сказано, что `proxy-app` может осуществлять запросы к `echoserver`:
 
 ```shell script
 kubectl apply -f manage-traffic/proxy-app-sidecar-enable.yaml
 ```
 
-По ссылке [http://127.0.0.1:32081/?url=http://echoserver.default](http://127.0.0.1:32081/?url=http://echoserver.default)
-видно, что доступ до `echoserver` появился.
-
-## Конфигурация proxy
-
-Решим задачу сбора метрик с proxy добавив фильтр статистики:
+Выполнить запрос к сервису `echoserver`:
 
 ```shell script
-kubectl apply -f proxy-config/inbound-http-metrics.yaml
+curl "$(minikube service proxy-app --url)?url=http://echoserver"
 ```
 
-После этого сделаем несколько запросов к сервису:
-[http://127.0.0.1:32081/?url=http://echoserver.default](http://127.0.0.1:32081/?url=http://echoserver.default).
+В результате исполнения команды видно, что запрос на `echoserver` проходит.
 
-Зайдем в [Prometheus](http://127.0.0.1:32082) и запросим данные:
+## Настраиваем безопасности
 
-```text
-round(sum(rate(istio_requests_total{reporter="destination"}[1m])) by (destination_workload), 0.001)```
+В качестве примера настройки безопасности будем использовать настройку межсервисной аутентификации.
+
+Включить аутентификацию для `echoserver`:
+
+```shell script
+kubectl apply -f auth/echoserver-auth.yaml
+```
+
+Выполнить запрос к сервису `echoserver`:
+
+```shell script
+curl "$(minikube service proxy-app --url)?url=http://echoserver"
+```
+
+Выполнить запрос к сервису с указанием токена:
+
+```shell script
+curl -H "X-AUTH-TOKEN: token" "$(minikube service proxy-app --url)?url=http://echoserver"
+```
+
+Добавить автоматическую подстановку токена при вызове сервиса `echoserver`:
+
+```shell script
+kubectl apply -f auth/proxy-app-auth.yaml
+```
+
+Выполнить запрос к сервису `echoserver` без указания токена:
+
+```shell script
+curl "$(minikube service proxy-app --url)?url=http://echoserver"
+```
+
+## Настраиваем отказоустойчивость
+
+Рассмотрим настройку отказоустойчивости для метода `http://echoserver/error?times=3`. При его вызове
+последовательно возвращается 500 ошибка в количестве, указанном в параметре `times`. В этом случае,
+метод вернёт ошибку 3 раза, а на 4 вернет код 200.
+
+```shell script
+curl "$(minikube service proxy-app --url)?url=http://echoserver/error?times=3"
+```
+
+Применим правило, которое позволяет автоматически делать повтор запроса при возникновении ошибок с кодом 500
+или ошибок соединения.
+
+Применить политику повторов:
+
+```shell script
+kubectl apply -f retries/echoserver-retries.yaml
+```
+
+Выполнить запрос:
+
+```shell script
+curl "$(minikube service proxy-app --url)?url=http://echoserver/error?times=3"
+```

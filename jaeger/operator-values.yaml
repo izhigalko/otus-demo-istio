@@ -1,0 +1,4 @@
+---
+fullnameOverride: jaeger-operator
+rbac:
+  clusterRole: true

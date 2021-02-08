@@ -1,0 +1,43 @@
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: echoserver-auth
+  namespace: default
+spec:
+  workloadSelector:
+    labels:
+      app: echoserver
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          portNumber: 8080
+          filterChain:
+            filter:
+              name: "envoy.http_connection_manager"
+              subFilter:
+                name: "envoy.router"
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.lua
+          typed_config:
+            "@type": "type.googleapis.com/envoy.config.filter.http.lua.v2.Lua"
+            inlineCode: |
+
+              function is_request_authenticated(request)
+                local token = request:headers():get("x-auth-token")
+                return token == "token"
+              end
+
+              function envoy_on_request(request)
+                local is_authenticated = is_request_authenticated(request)
+
+                if not is_authenticated then
+                  request:respond({[":status"] = 403}, "")
+                else
+                  request:headers():replace("X-Service", service)
+                end
+              end
