@@ -6,7 +6,7 @@
 
 - [Minikube 1.13.1](https://github.com/kubernetes/minikube/releases/tag/v1.13.1)
 - [Kubectl 0.19.2](https://github.com/kubernetes/kubectl/releases/tag/v0.19.2)
-- [Istioctl 1.7.3](https://github.com/istio/istio/releases/tag/1.7.3)
+- [Istioctl 1.7.3](https://github.com/istio/istio/releases/tag/1.9.0)
 - [Heml 3.3.4](https://github.com/helm/helm/releases/tag/v3.3.4)
 
 После установки нужно запустить Kubernetes. При необходимости можно изменить используемый драйвер с помощью
@@ -31,6 +31,12 @@ DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmi
 
 ## Устройство Istio
 
+Создать неймспейсы для операторов:
+
+```shell script
+kubectl apply -f namespaces.yaml
+```
+
 ### Разворачиваем Jaeger
 
 Jaeger - решение трассировки. Компоненты Istio, такие как: sidecar-контейнер, gateway, отправляют данные запросов в
@@ -46,7 +52,7 @@ helm repo update
 Установить оператор, разворачивающий Jaeger:
 
 ```shell script
-helm install --version "2.17.0" -n jaeger-operator --create-namespace -f jaeger/operator-values.yaml \
+helm install --version "2.19.0" -n jaeger-operator -f jaeger/operator-values.yaml \
 jaeger-operator jaegertracing/jaeger-operator
 ``` 
 
@@ -83,7 +89,7 @@ helm repo update
 Развернуть решение по мониторингу на основе Prometheus:
 
 ```shell script
-helm install --version "9.4.4" -n monitoring --create-namespace -f prometheus/operator-values.yaml prometheus \
+helm install --version "13.7.2" -n monitoring -f prometheus/operator-values.yaml prometheus \
 prometheus-community/kube-prometheus-stack
 ``` 
 
@@ -147,13 +153,19 @@ helm repo update
 Установить Kiali Operator, разворачивающий Kiali
 
 ```shell script
-helm install --version "1.22.0" -n kiali-operator --create-namespace kiali-operator kiali/kiali-operator
+helm install --version "1.29.1" -n kiali-operator kiali-operator kiali/kiali-operator
 ```
 
 Развернуть Kiali:
 
 ```shell script
 kubectl apply -f kiali/kiali.yaml
+```
+
+Проверить состояние Kiali:
+
+```shell script
+kubectl get po -n kiali -l app.kubernetes.io/name=kiali
 ```
 
 Открыть web-интерфейс Kiali:

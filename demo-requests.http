@@ -1,0 +1,20 @@
+###
+
+GET {{ echoserver }}
+
+###
+
+GET {{ proxy-app }}
+
+###
+
+GET {{ proxy-app }}?url=http://echoserver
+
+###
+
+GET {{ proxy-app }}?url=http://echoserver
+X-AUTH-TOKEN: token
+
+###
+
+GET {{ proxy-app }}?url=http://echoserver/error?times=3

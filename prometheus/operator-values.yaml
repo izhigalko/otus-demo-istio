@@ -5,6 +5,10 @@ grafana:
   adminPassword: admin
   podLabels:
     app: grafana
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
 
 prometheus:
   prometheusSpec:
