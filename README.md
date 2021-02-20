@@ -6,7 +6,7 @@
 
 - [Minikube 1.13.1](https://github.com/kubernetes/minikube/releases/tag/v1.13.1)
 - [Kubectl 0.19.2](https://github.com/kubernetes/kubectl/releases/tag/v0.19.2)
-- [Istioctl 1.7.3](https://github.com/istio/istio/releases/tag/1.9.0)
+- [Istioctl 1.9.0](https://github.com/istio/istio/releases/tag/1.9.0)
 - [Heml 3.3.4](https://github.com/helm/helm/releases/tag/v3.3.4)
 
 После установки нужно запустить Kubernetes. При необходимости можно изменить используемый драйвер с помощью
