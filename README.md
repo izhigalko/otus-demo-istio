@@ -4,22 +4,19 @@
 
 Для выполнения задания вам потребуется установить зависимости:
 
-- [Minikube 1.13.1](https://github.com/kubernetes/minikube/releases/tag/v1.13.1)
+- [Minikube 1.24.0](https://github.com/kubernetes/minikube/releases/tag/v1.24.0)
 - [Kubectl 0.19.2](https://github.com/kubernetes/kubectl/releases/tag/v0.19.2)
-- [Istioctl 1.9.0](https://github.com/istio/istio/releases/tag/1.9.0)
+- [Istioctl 1.9.7](https://github.com/istio/istio/releases/tag/1.9.7)
 - [Heml 3.3.4](https://github.com/helm/helm/releases/tag/v3.3.4)
 
 После установки нужно запустить Kubernetes. При необходимости можно изменить используемый драйвер с помощью
 флага `--driver`. 
 
 ```shell script
-minikube start \
+minikube start --driver virtualbox \
 --cpus=4 --memory=8g \
 --cni=flannel \
---kubernetes-version="v1.19.0" \
---extra-config=apiserver.enable-admission-plugins=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,\
-DefaultTolerationSeconds,NodeRestriction,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota,PodPreset \
---extra-config=apiserver.authorization-mode=Node,RBAC
+--kubernetes-version="v1.19.0"
 ```
 
 Операции будут совершаться с помощью утилиты `kubectl`
@@ -139,6 +136,12 @@ kubectl apply -f istio/istio.yaml
 kubectl get all -n istio-system -l istio.io/rev=default
 ```
 
+Установить настройки по-умолчанию:
+
+```shell
+kubectl apply -f istio/disable-mtls.yaml
+```
+
 ### Устанавливаем Kiali
 
 Kiali - доска управления Service mesh
@@ -153,7 +156,7 @@ helm repo update
 Установить Kiali Operator, разворачивающий Kiali
 
 ```shell script
-helm install --version "1.33.1" -n kiali-operator kiali-operator kiali/kiali-operator
+helm install --version "1.33.1" -n kiali-operator -f kiali/operator-values.yaml kiali-operator kiali/kiali-operator
 ```
 
 Развернуть Kiali:
@@ -347,4 +350,11 @@ kubectl apply -f retries/echoserver-retries.yaml
 
 ```shell script
 curl "$(minikube service proxy-app --url)?url=http://echoserver/error?times=3"
+```
+
+## Получить настройки iptables
+
+```shell
+docker inspect <app-container> --format '{{ .State.Pid }}'
+nsenter -t <pid> -n iptables -t nat -S
 ```

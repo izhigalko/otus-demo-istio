@@ -13,6 +13,8 @@ metadata:
   name: kiali
   namespace: kiali
 spec:
+  deployment:
+    image_version: "v1.33.1"
   istio_namespace: "istio-system"
   istio_component_namespaces:
     prometheus: monitoring
@@ -52,7 +54,6 @@ spec:
     tracing:
       enabled: true
       in_cluster_url: "http://jaeger-query.jaeger:16686"
-      url: "http://jaeger-query.jaeger:16686"
       component_status:
         namespace: "jaeger"
         app_label: "jaeger"
