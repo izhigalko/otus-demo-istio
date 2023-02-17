@@ -1,0 +1,41 @@
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: external-service
+spec:
+  hosts:
+    - yandex.ru
+  ports:
+    - number: 80
+      name: http
+      protocol: http
+  resolution: DNS
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-service
+  namespace: default
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      name: http
+
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: external-service
+spec:
+  hosts:
+    - external-service
+  http:
+    - match:
+        - authority:
+            exact: external-service
+      route:
+        - destination:
+            host: yandex.ru
